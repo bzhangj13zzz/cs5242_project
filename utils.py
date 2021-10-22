@@ -100,25 +100,33 @@ def calc_acc(pred, label):
     return torch.mean((classes == label).float())
 
 class GarbageDataset(Dataset):
-    def __init__(self, csv_path, vocab: Vocabulary, max_length=10):
+    def __init__(self, csv_path, vocab: Vocabulary, max_length):
+        # Note that in the original dataset, the labels are set to be:
+        # 1 -> Recyclable, 2 -> Hazardous, 4 -> Wet, 8 -> Dry, 16 -> Bulky
+        # We drop 'Bulky' as we do not classify it, and we map it to the 0 - 3 labels we want.
         self.label_mapping = {1: 0, 2: 1, 4: 2, 8: 3}
+
         df = pd.read_csv(csv_path)
+        # Drop the bulky garbage type
         df = df[df['label'] != 16]
 
         seqs = df['cleaned_en'].tolist()
         tokenized_seqs = [word_tokenize(seq) for seq in seqs]
         vectorized_seqs = []
+
         for seq in tokenized_seqs:
             vectorized_seq = vocab.convert_words_to_idxs(seq)
             if len(vectorized_seq) > max_length:
+                # Truncate
                 vectorized_seq = vectorized_seq[:max_length]
             else:
+                # Pad
                 while len(vectorized_seq) < max_length:
                     vectorized_seq.append(0)
             vectorized_seqs.append(vectorized_seq)
         
         labels = [self.label_mapping[l] for l in df['label'].tolist()]
-        # Input vector will have shape (max_len * emb_dim)
+
         self.x = vectorized_seqs
         self.y = labels
     
